@@ -3,35 +3,28 @@ import dotenv from "dotenv/config";
 import connectDB from "./config/db.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import User from "./models/userModel.js";
+
 import authRouter from "./routes/authRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
-import auth from "./middleware/authMiddleware.js";
 import pmRouter from "./routes/pmRoutes.js";
 import devRouter from "./routes/devRoutes.js";
 
 const app = express();
-
 const port = process.env.PORT || 5000;
 
+// ✅ Connect MongoDB
 connectDB();
 
-// Backend Dependencies
+// ✅ Middleware
 app.use(express.json());
 app.use(cookieParser());
-// app.use(
-//   cors({
-//     origin: process.env.CLIENT_URL,
-//     credentials: true,
-//   })
-// );
 
-// import cors from "cors";
-
+// ✅ CORS Configuration
 const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:4173",
-  process.env.CLIENT_URL, // e.g., https://projekt-frontend.onrender.com
+  "http://localhost:5173", // local dev
+  "http://localhost:4173", // vite preview
+  "https://projekt-frontend-1ldm.onrender.com", // your Render frontend URL
+  process.env.CLIENT_URL, // fallback from .env
 ];
 
 app.use(
@@ -40,26 +33,26 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.log("❌ Blocked by CORS:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true,
+    credentials: true, // allow cookies
   })
 );
 
-// Routes
+// ✅ Routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/pm", pmRouter);
 app.use("/api/v1/dev", devRouter);
 
-// test api
+// ✅ Test API
 app.get("/", (req, res) => {
-  res.status(200).json({
-    message: "API Running successfully",
-  });
+  res.status(200).json({ message: "API Running successfully 🚀" });
 });
 
+// ✅ Start Server
 app.listen(port, () => {
-  console.log(`App running successfully on port : ${port}`);
+  console.log(`✅ Server running on port ${port}`);
 });
