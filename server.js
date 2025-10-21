@@ -19,33 +19,33 @@ connectDB();
 // Backend Dependencies
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-  })
-);
-
-// import cors from "cors";
-
-// const allowedOrigins = [
-//   "http://localhost:5173",
-//   "http://localhost:4173",
-//   process.env.CLIENT_URL, // e.g., https://projekt-frontend.onrender.com
-// ];
-
 // app.use(
 //   cors({
-//     origin: function (origin, callback) {
-//       if (!origin || allowedOrigins.includes(origin)) {
-//         callback(null, true);
-//       } else {
-//         callback(new Error("Not allowed by CORS"));
-//       }
-//     },
+//     origin: process.env.CLIENT_URL,
 //     credentials: true,
 //   })
 // );
+
+// import cors from "cors";
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  process.env.CLIENT_URL, // e.g., https://projekt-frontend.onrender.com
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Routes
 app.use("/api/v1/auth", authRouter);
