@@ -14,7 +14,7 @@ const roleCheck = (allowedRoles = []) => {
           message: "Access denied: You do not have permission for this action",
         });
       }
-
+// no comments
       next();
     } catch (error) {
       console.error("Role check failed:", error.message);
