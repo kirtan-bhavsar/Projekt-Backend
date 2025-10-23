@@ -21,11 +21,10 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid role specified" });
     }
 
-    const creatorRole = req.user.role; // e.g., "admin" or "pm"
+    const creatorRole = req.user.role; 
 
     if (creatorRole === "admin") {
     } else if (creatorRole === "pm") {
-      // ⚠️ PM can only create Developer
       if (role !== "developer") {
         return res.status(403).json({
           message: "Project Manager can only create Developer accounts",
@@ -95,7 +94,6 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    // ✅ Match both email AND role
     const user = await User.findOne({ email, role });
     if (!user) {
       return res
@@ -108,7 +106,6 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // ✅ Generate cookie + token
     generateToken(res, user);
 
     res.status(200).json({
