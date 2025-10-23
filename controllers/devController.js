@@ -56,7 +56,6 @@ const updateTaskStatus = async (req, res) => {
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    // Check ownership
     if (task.assignedTo.toString() !== devId.toString())
       return res.status(403).json({
         message: "You are not authorized to update this task",
