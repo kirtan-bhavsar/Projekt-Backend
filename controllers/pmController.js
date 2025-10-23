@@ -2,7 +2,6 @@ import Project from "../models/projectModel.js";
 import Task from "../models/taskModel.js";
 import User from "../models/userModel.js";
 
-// Redundant code
 const ensurePmOwnsProject = async (projectId, pmId) => {
   const project = await Project.findById(projectId);
   if (!project) throw { status: 404, message: "Project not found" };
@@ -47,7 +46,6 @@ const getMyProjects = async (req, res) => {
 // @access PM
 
 const createTask = async (req, res) => {
-  console.log("createTask called------------------------------------");
   try {
     const pmId = req.user.id;
     const { projectId } = req.params;
@@ -75,7 +73,6 @@ const createTask = async (req, res) => {
     if (dueDate < new Date())
       return res.status(400).json({ message: "dueDate cannot be in the past" });
 
-    // Prevent duplicate titles (case-insensitive)
     const existingTask = await Task.findOne({
       project: projectId,
       title: { $regex: new RegExp(`^${title}$`, "i") },
@@ -129,96 +126,6 @@ const getProjectTasks = async (req, res) => {
 // @desc Update a task (title, dueDate, assignedTo, status)
 // @route PUT /api/pm/tasks/:taskId
 // @access PM
-// @desc Update a task (title, dueDate, assignedTo)
-// @route PUT /api/pm/tasks/:taskId
-// @access PM
-// const updateTask = async (req, res) => {
-//   try {
-//     const pmId = req.user.id;
-//     const { taskId } = req.params;
-//     let { title, assignedTo, dueDate } = req.body;
-
-//     const task = await Task.findById(taskId);
-//     if (!task) return res.status(404).json({ message: "Task not found" });
-
-//     // ✅ Ensure PM owns the project
-//     await ensurePmOwnsProject(task.project, pmId);
-
-//     // ❌ Prevent editing if task is completed
-//     if (task.status === "completed") {
-//       return res
-//         .status(400)
-//         .json({ message: "Cannot modify a completed task" });
-//     }
-
-//     const updates = {};
-
-//     // 📝 Update title (if provided and different)
-//     if (title && title.trim() !== task.title) {
-//       const duplicate = await Task.findOne({
-//         _id: { $ne: task._id },
-//         project: task.project,
-//         title: { $regex: new RegExp(`^${title.trim()}$`, "i") },
-//       });
-//       if (duplicate)
-//         return res
-//           .status(400)
-//           .json({ message: "A task with this title already exists" });
-
-//       updates.title = title.trim();
-//     }
-
-//     // 📅 Update dueDate (if provided and different)
-//     if (dueDate) {
-//       const newDue = new Date(dueDate);
-//       if (newDue < new Date()) {
-//         return res
-//           .status(400)
-//           .json({ message: "Due date cannot be in the past" });
-//       }
-//       if (newDue.getTime() !== new Date(task.dueDate).getTime()) {
-//         updates.dueDate = newDue;
-//       }
-//     }
-
-//     // 👤 Update assignedTo (only if changed)
-//     if (assignedTo && assignedTo !== String(task.assignedTo)) {
-//       if (task.status === "ongoing") {
-//         return res.status(400).json({
-//           message: "Cannot reassign a task that is already ongoing",
-//         });
-//       }
-
-//       const newAssignee = await User.findById(assignedTo);
-//       if (!newAssignee)
-//         return res.status(400).json({ message: "Assigned user not found" });
-
-//       if (!["pm", "developer"].includes(newAssignee.role)) {
-//         return res
-//           .status(400)
-//           .json({ message: "Assignee must be a PM or Developer" });
-//       }
-
-//       updates.assignedTo = assignedTo;
-//     }
-
-//     // ✅ Proceed only if there's something to update
-//     if (Object.keys(updates).length === 0) {
-//       return res.status(400).json({ message: "No valid changes detected" });
-//     }
-
-//     const updatedTask = await Task.findByIdAndUpdate(task._id, updates, {
-//       new: true,
-//     });
-//     res
-//       .status(200)
-//       .json({ success: true, message: "Task updated", task: updatedTask });
-//   } catch (error) {
-//     console.error("Update Task Error:", error.message);
-//     const code = error.status || 500;
-//     res.status(code).json({ message: error.message || "Server error" });
-//   }
-// };
 
 const updateTask = async (req, res) => {
   try {
@@ -232,12 +139,10 @@ const updateTask = async (req, res) => {
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
 
-    // ✅ Ensure PM owns the project
     await ensurePmOwnsProject(task.project, pmId);
 
     const updates = {};
 
-    // 📝 Update title
     if (title && title.trim() !== task.title) {
       const duplicate = await Task.findOne({
         _id: { $ne: task._id },
@@ -252,7 +157,6 @@ const updateTask = async (req, res) => {
       updates.title = title.trim();
     }
 
-    // 📅 Update dueDate
     if (dueDate) {
       const newDue = new Date(dueDate);
       if (newDue < new Date()) {
@@ -263,7 +167,6 @@ const updateTask = async (req, res) => {
       updates.dueDate = newDue;
     }
 
-    // 👤 Update assignedTo (only if task is not ongoing)
     if (assignedTo && assignedTo !== String(task.assignedTo)) {
       if (task.status === "ongoing") {
         return res.status(400).json({
@@ -283,7 +186,6 @@ const updateTask = async (req, res) => {
       updates.assignedTo = assignedTo;
     }
 
-    // 🔄 Status Update (for Kanban drag-and-drop)
     if (status) {
       const validStatuses = ["pending", "ongoing", "completed"];
       if (!validStatuses.includes(status)) {
@@ -296,14 +198,13 @@ const updateTask = async (req, res) => {
           .json({ message: "Cannot modify a completed task" });
       }
 
-      // ⚠️ Enforce correct status transitions
       const from = task.status;
       const to = status;
 
       const validTransitions = {
-        pending: ["ongoing"], // can only go to ongoing
-        ongoing: ["completed"], // can only go to completed
-        completed: [], // no further transitions
+        pending: ["ongoing"],
+        ongoing: ["completed"],
+        completed: [],
       };
 
       if (!validTransitions[from].includes(to)) {
@@ -312,7 +213,6 @@ const updateTask = async (req, res) => {
         });
       }
 
-      // ⏱️ Timestamp tracking
       if (from === "pending" && to === "ongoing") {
         updates.status = "ongoing";
         updates.initiatedAt = new Date();
@@ -322,17 +222,14 @@ const updateTask = async (req, res) => {
       }
     }
 
-    // 🚫 No valid change detected
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: "No valid updates detected" });
     }
 
-    // ✅ Save updates
     const updatedTask = await Task.findByIdAndUpdate(task._id, updates, {
       new: true,
     });
 
-    // 🔁 Refresh project status if task status changed
     if (updates.status) await refreshProjectStatus(task.project);
 
     res.status(200).json({
@@ -385,7 +282,6 @@ const getMyTasks = async (req, res) => {
   try {
     const pmId = req.user.id;
 
-    // Fetch all tasks assigned to this PM
     const tasks = await Task.find({ assignedTo: pmId })
       .populate("project", "title status")
       .populate("assignedTo", "name email role");
@@ -408,12 +304,10 @@ const fetchUsers = async (req, res) => {
   try {
     const pmId = req.user.id;
 
-    // Fetch all developers
     const developers = await User.find({ role: "developer" }).select(
       "name email role"
     );
 
-    // Fetch PM’s own profile
     const pm = await User.findById(pmId).select("name email role");
 
     const users = [pm, ...developers];
