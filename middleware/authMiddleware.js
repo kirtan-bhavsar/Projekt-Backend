@@ -4,7 +4,6 @@ dotenv.config();
 
 const auth = async (req, res, next) => {
   try {
-    // Extracting cookie
     let token =
       req.cookies?.jwtToken ||
       (req.headers.authorization?.startsWith("Bearer ")
@@ -16,7 +15,6 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: "No token found, access denied" });
     }
 
-    // Verifying JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded.user;
