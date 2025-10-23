@@ -1,4 +1,3 @@
-// controllers/adminController.js
 import Project from "../models/projectModel.js";
 import Task from "../models/taskModel.js";
 import User from "../models/userModel.js";
@@ -85,7 +84,6 @@ const deleteProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    // Cascade delete all tasks related to this project
     await Task.deleteMany({ project: project._id });
 
     await Project.findByIdAndDelete(id);
