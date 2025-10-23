@@ -132,11 +132,102 @@ const getProjectTasks = async (req, res) => {
 // @desc Update a task (title, dueDate, assignedTo)
 // @route PUT /api/pm/tasks/:taskId
 // @access PM
+// const updateTask = async (req, res) => {
+//   try {
+//     const pmId = req.user.id;
+//     const { taskId } = req.params;
+//     let { title, assignedTo, dueDate } = req.body;
+
+//     const task = await Task.findById(taskId);
+//     if (!task) return res.status(404).json({ message: "Task not found" });
+
+//     // ✅ Ensure PM owns the project
+//     await ensurePmOwnsProject(task.project, pmId);
+
+//     // ❌ Prevent editing if task is completed
+//     if (task.status === "completed") {
+//       return res
+//         .status(400)
+//         .json({ message: "Cannot modify a completed task" });
+//     }
+
+//     const updates = {};
+
+//     // 📝 Update title (if provided and different)
+//     if (title && title.trim() !== task.title) {
+//       const duplicate = await Task.findOne({
+//         _id: { $ne: task._id },
+//         project: task.project,
+//         title: { $regex: new RegExp(`^${title.trim()}$`, "i") },
+//       });
+//       if (duplicate)
+//         return res
+//           .status(400)
+//           .json({ message: "A task with this title already exists" });
+
+//       updates.title = title.trim();
+//     }
+
+//     // 📅 Update dueDate (if provided and different)
+//     if (dueDate) {
+//       const newDue = new Date(dueDate);
+//       if (newDue < new Date()) {
+//         return res
+//           .status(400)
+//           .json({ message: "Due date cannot be in the past" });
+//       }
+//       if (newDue.getTime() !== new Date(task.dueDate).getTime()) {
+//         updates.dueDate = newDue;
+//       }
+//     }
+
+//     // 👤 Update assignedTo (only if changed)
+//     if (assignedTo && assignedTo !== String(task.assignedTo)) {
+//       if (task.status === "ongoing") {
+//         return res.status(400).json({
+//           message: "Cannot reassign a task that is already ongoing",
+//         });
+//       }
+
+//       const newAssignee = await User.findById(assignedTo);
+//       if (!newAssignee)
+//         return res.status(400).json({ message: "Assigned user not found" });
+
+//       if (!["pm", "developer"].includes(newAssignee.role)) {
+//         return res
+//           .status(400)
+//           .json({ message: "Assignee must be a PM or Developer" });
+//       }
+
+//       updates.assignedTo = assignedTo;
+//     }
+
+//     // ✅ Proceed only if there's something to update
+//     if (Object.keys(updates).length === 0) {
+//       return res.status(400).json({ message: "No valid changes detected" });
+//     }
+
+//     const updatedTask = await Task.findByIdAndUpdate(task._id, updates, {
+//       new: true,
+//     });
+//     res
+//       .status(200)
+//       .json({ success: true, message: "Task updated", task: updatedTask });
+//   } catch (error) {
+//     console.error("Update Task Error:", error.message);
+//     const code = error.status || 500;
+//     res.status(code).json({ message: error.message || "Server error" });
+//   }
+// };
+
 const updateTask = async (req, res) => {
   try {
+    console.log(req.body);
+    console.log("req.body for pm updateTask");
+    console.log("req.body for pm updateTask");
     const pmId = req.user.id;
     const { taskId } = req.params;
-    let { title, assignedTo, dueDate } = req.body;
+    let { title, assignedTo, dueDate, status } = req.body;
 
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ message: "Task not found" });
@@ -144,16 +235,9 @@ const updateTask = async (req, res) => {
     // ✅ Ensure PM owns the project
     await ensurePmOwnsProject(task.project, pmId);
 
-    // ❌ Prevent editing if task is completed
-    if (task.status === "completed") {
-      return res
-        .status(400)
-        .json({ message: "Cannot modify a completed task" });
-    }
-
     const updates = {};
 
-    // 📝 Update title (if provided and different)
+    // 📝 Update title
     if (title && title.trim() !== task.title) {
       const duplicate = await Task.findOne({
         _id: { $ne: task._id },
@@ -168,7 +252,7 @@ const updateTask = async (req, res) => {
       updates.title = title.trim();
     }
 
-    // 📅 Update dueDate (if provided and different)
+    // 📅 Update dueDate
     if (dueDate) {
       const newDue = new Date(dueDate);
       if (newDue < new Date()) {
@@ -176,12 +260,10 @@ const updateTask = async (req, res) => {
           .status(400)
           .json({ message: "Due date cannot be in the past" });
       }
-      if (newDue.getTime() !== new Date(task.dueDate).getTime()) {
-        updates.dueDate = newDue;
-      }
+      updates.dueDate = newDue;
     }
 
-    // 👤 Update assignedTo (only if changed)
+    // 👤 Update assignedTo (only if task is not ongoing)
     if (assignedTo && assignedTo !== String(task.assignedTo)) {
       if (task.status === "ongoing") {
         return res.status(400).json({
@@ -189,36 +271,82 @@ const updateTask = async (req, res) => {
         });
       }
 
-      const newAssignee = await User.findById(assignedTo);
-      if (!newAssignee)
+      const assignee = await User.findById(assignedTo);
+      if (!assignee)
         return res.status(400).json({ message: "Assigned user not found" });
 
-      if (!["pm", "developer"].includes(newAssignee.role)) {
+      if (!["pm", "developer"].includes(assignee.role))
         return res
           .status(400)
           .json({ message: "Assignee must be a PM or Developer" });
-      }
 
       updates.assignedTo = assignedTo;
     }
 
-    // ✅ Proceed only if there's something to update
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "No valid changes detected" });
+    // 🔄 Status Update (for Kanban drag-and-drop)
+    if (status) {
+      const validStatuses = ["pending", "ongoing", "completed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value" });
+      }
+
+      if (task.status === "completed") {
+        return res
+          .status(400)
+          .json({ message: "Cannot modify a completed task" });
+      }
+
+      // ⚠️ Enforce correct status transitions
+      const from = task.status;
+      const to = status;
+
+      const validTransitions = {
+        pending: ["ongoing"], // can only go to ongoing
+        ongoing: ["completed"], // can only go to completed
+        completed: [], // no further transitions
+      };
+
+      if (!validTransitions[from].includes(to)) {
+        return res.status(400).json({
+          message: `Invalid transition: cannot move from "${from}" to "${to}"`,
+        });
+      }
+
+      // ⏱️ Timestamp tracking
+      if (from === "pending" && to === "ongoing") {
+        updates.status = "ongoing";
+        updates.initiatedAt = new Date();
+      } else if (from === "ongoing" && to === "completed") {
+        updates.status = "completed";
+        updates.completedAt = new Date();
+      }
     }
 
+    // 🚫 No valid change detected
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid updates detected" });
+    }
+
+    // ✅ Save updates
     const updatedTask = await Task.findByIdAndUpdate(task._id, updates, {
       new: true,
     });
-    res
-      .status(200)
-      .json({ success: true, message: "Task updated", task: updatedTask });
+
+    // 🔁 Refresh project status if task status changed
+    if (updates.status) await refreshProjectStatus(task.project);
+
+    res.status(200).json({
+      success: true,
+      message: "Task updated successfully",
+      task: updatedTask,
+    });
   } catch (error) {
     console.error("Update Task Error:", error.message);
     const code = error.status || 500;
     res.status(code).json({ message: error.message || "Server error" });
   }
 };
+
 
 // @desc Delete a task (only if not ongoing)
 // @route DELETE /api/pm/tasks/:taskId
